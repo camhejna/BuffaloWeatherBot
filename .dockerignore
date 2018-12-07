@@ -1,0 +1,10 @@
+*.md
+LICENSE
+.git
+.gitignore
+.DS_Store
+.idea/
+Procfile
+runtime.txt
+fixtures/
+test.py
