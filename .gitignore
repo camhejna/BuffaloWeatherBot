@@ -57,6 +57,7 @@ target/
 
 # IDEs
 .idea/
+.vscode/
 
 # keys.py that contains private keys
 keys.py
