@@ -315,7 +315,7 @@ def get_cache(file='.wbcache.p'):
         return CACHE
 
 
-def tweet_logic(weather_data, wb_string):
+def tweet_logic(weather_buffalo, weather_other, wb_string):
     """
     Core logic for tweets once initialization and configuration has been set and weather data fetched.
     :type weather_data: models.WeatherData
@@ -324,19 +324,20 @@ def tweet_logic(weather_data, wb_string):
     # pylint: disable=global-variable-not-assigned
     # CACHE is being modified here, pylint doesn't see that
     global CACHE
-    wb_string.set_weather(weather_data)
-    special = wb_string.special()
+    wb_string.set_weather(weather_buffalo, weather_other)
+    special = wb_string.special(weather_buffalo)
     normal_text = wb_string.normal()
+    compare_text = wb_string.compare(weather_buffalo, weather_other)
 
     now = datetime.utcnow()
     now_utc = utils.datetime_to_utc('UTC', now)
-    now_local = utils.localize_utc_datetime(weather_data.timezone, now)
+    now_local = utils.localize_utc_datetime(weather_buffalo.timezone, now)
 
-    do_tweet(normal_text,
-                     weather_data.location,
-                     CONFIG['basic']['tweet_location'],
-                     CONFIG['variable_location']['enabled'],
-                     hashtag=CONFIG['basic']['hashtag'])
+    do_tweet(compare_text,
+             weather_buffalo.location,
+             CONFIG['basic']['tweet_location'],
+             CONFIG['variable_location']['enabled'],
+             hashtag=CONFIG['basic']['hashtag'])
     
     return
 
@@ -416,9 +417,7 @@ def main(path):
     buffalo = CONFIG['buffalo_location']
     moscow = CONFIG['moscow_location']
     updated_time = utils.datetime_to_utc('UTC', datetime.utcnow()) - timedelta(minutes=30)
-
-    buffalo_tweet = False
-    moscow_tweet = False
+    tweet = False
 
     try:
         while True:
@@ -432,29 +431,20 @@ def main(path):
                                            wb_string.language)
             moscow_forecast = get_forecast_object(moscow.lat, moscow.lng, CONFIG['basic']['units'],
                                            wb_string.language)
-                                           
-            if (buffalo_forecast is not None) and (not buffalo_tweet):
+
+            if (buffalo_forecast is not None) and (moscow_forecast is not None):
                 weather_buffalo = models.WeatherData(buffalo_forecast, buffalo)
-                if weather_buffalo.valid:
-                    CACHE = get_cache()
-                    tweet_logic(weather_buffalo, wb_string)
-                CACHE['throttles'] = cleanse_throttles(CACHE['throttles'], now_utc)
-                set_cache(CACHE)
-                buffalo_tweet = True
-
-            if (moscow_forecast is not None) and (not moscow_tweet):
                 weather_moscow = models.WeatherData(moscow_forecast, moscow)
-                if weather_moscow.valid:
+                if weather_buffalo.valid and weather_moscow.valid:
                     CACHE = get_cache()
-                    tweet_logic(weather_moscow, wb_string)
+                    tweet_logic(weather_buffalo, weather_moscow, wb_string)
                 CACHE['throttles'] = cleanse_throttles(CACHE['throttles'], now_utc)
                 set_cache(CACHE)
-                moscow_tweet = True
+                tweet = True
 
-            if buffalo_tweet and moscow_tweet:
+            if tweet:
                 time.sleep(CONFIG['basic']['refresh'] * 60)
-                buffalo_tweet = False
-                moscow_tweet = False
+                tweet = False
             else:
                 time.sleep(60)
 
