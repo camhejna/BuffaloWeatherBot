@@ -60,9 +60,12 @@ def load_config(path):
             'conditions': utils.get_times(conf['scheduled times'].get('conditions',
                                                                       '7:00\n12:00\n15:00\n18:00\n22:00'))
         },
-        'default_location': models.WeatherLocation(lat=conf['default location'].getfloat('lat', 45.585),
-                                                   lng=conf['default location'].getfloat('lng', -95.91),
-                                                   name=conf['default location'].get('name', 'Morris, MN')),
+        'buffalo_location': models.WeatherLocation(lat=conf['buffalo location'].getfloat('lat', 45.585),
+                                                   lng=conf['buffalo location'].getfloat('lng', -95.91),
+                                                   name=conf['buffalo location'].get('name', 'Morris, MN')),
+        'moscow_location': models.WeatherLocation(lat=conf['moscow location'].getfloat('lat', 0.0),
+                                                  lng=conf['moscow location'].getfloat('lng', 0.0),
+                                                  name=conf['moscow location'].get('name', '????')),
         'variable_location': {
             'enabled': conf['variable location'].getboolean('enabled', False),
             'user': conf['variable location'].get('user', 'BrianMitchL'),
@@ -329,6 +332,14 @@ def tweet_logic(weather_data, wb_string):
     now_utc = utils.datetime_to_utc('UTC', now)
     now_local = utils.localize_utc_datetime(weather_data.timezone, now)
 
+    do_tweet(normal_text,
+                     weather_data.location,
+                     CONFIG['basic']['tweet_location'],
+                     CONFIG['variable_location']['enabled'],
+                     hashtag=CONFIG['basic']['hashtag'])
+    
+    return
+
     # weather alerts
     for alert in weather_data.alerts:
         if alert.sha() not in CACHE['throttles'] and not alert.expired(now_utc):
@@ -402,8 +413,13 @@ def main(path):
             logging.error('Could not read YAML file, please correct, run yamllint, and try again.')
             exit()
 
-    location = CONFIG['default_location']
+    buffalo = CONFIG['buffalo_location']
+    moscow = CONFIG['moscow_location']
     updated_time = utils.datetime_to_utc('UTC', datetime.utcnow()) - timedelta(minutes=30)
+
+    buffalo_tweet = False
+    moscow_tweet = False
+
     try:
         while True:
             # check for new location every 30 minutes
@@ -411,18 +427,37 @@ def main(path):
             if CONFIG['variable_location']['enabled'] and updated_time + timedelta(minutes=30) < now_utc:
                 location = get_location_from_user_timeline(CONFIG['variable_location']['user'], location)
                 updated_time = now_utc
-            forecast = get_forecast_object(location.lat, location.lng, CONFIG['basic']['units'],
+
+            buffalo_forecast = get_forecast_object(buffalo.lat, buffalo.lng, CONFIG['basic']['units'],
                                            wb_string.language)
-            if forecast is not None:
-                weather_data = models.WeatherData(forecast, location)
-                if weather_data.valid:
+            moscow_forecast = get_forecast_object(moscow.lat, moscow.lng, CONFIG['basic']['units'],
+                                           wb_string.language)
+                                           
+            if (buffalo_forecast is not None) and (not buffalo_tweet):
+                weather_buffalo = models.WeatherData(buffalo_forecast, buffalo)
+                if weather_buffalo.valid:
                     CACHE = get_cache()
-                    tweet_logic(weather_data, wb_string)
+                    tweet_logic(weather_buffalo, wb_string)
                 CACHE['throttles'] = cleanse_throttles(CACHE['throttles'], now_utc)
                 set_cache(CACHE)
+                buffalo_tweet = True
+
+            if (moscow_forecast is not None) and (not moscow_tweet):
+                weather_moscow = models.WeatherData(moscow_forecast, moscow)
+                if weather_moscow.valid:
+                    CACHE = get_cache()
+                    tweet_logic(weather_moscow, wb_string)
+                CACHE['throttles'] = cleanse_throttles(CACHE['throttles'], now_utc)
+                set_cache(CACHE)
+                moscow_tweet = True
+
+            if buffalo_tweet and moscow_tweet:
                 time.sleep(CONFIG['basic']['refresh'] * 60)
+                buffalo_tweet = False
+                moscow_tweet = False
             else:
                 time.sleep(60)
+
     except Exception as err:
         logging.error(err)
         logging.error('We got an exception!', exc_info=True)
