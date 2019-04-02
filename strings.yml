@@ -64,6 +64,16 @@ normal_conditions:
   - "Only in {location} would it be {temp} and {summary} right now."
   - "I hope you like that it's {summary}. It's {temp}."
   - "{summary} and {temp}. \U0001f4af\U0001f4af\U0001f4af"
+# use t1, t2, sum1, sum2, loc1, and loc2
+compare_conditions:
+  good:
+    - "Weather in {loc1}: {sum1} and {t1} \nWeather in {loc2}: {sum2} and {t2}."
+    - "Hey {loc1}, it's {sum1} and {t1}. Better than {sum2} and {t2} in {loc2}."
+    - "{sum1} and {t1} in {loc1}. {sum2} and {t2} in {loc2}."
+  bad:
+    - "Weather in {loc1}: {sum1} and {t1} \nWeather in {loc2}: {sum2} and {t2}."
+    - "Sucks for you {loc1}, it's {sum1} and {t1}. You could be in {loc2} where it's {sum2} and {t2}"
+    - "Hey {loc1}, it's {sum1} and {t1}, but in {loc2} it's {sum2} and {t2}"
 # use 'apparent_temp', 'temp', 'wind_speed', 'wind_bearing', 'humidity',
 # 'summary', or 'location'
 special_conditions:
